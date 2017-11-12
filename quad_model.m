@@ -1,7 +1,6 @@
 classdef quad_model
     % x  = [x y z phi theta yaw xd yd zd wx wy wz]'
     %       1 2 3  4    5    6  7  8  9  10 11 12
-    
     properties
         x
         m, g
@@ -19,7 +18,7 @@ classdef quad_model
             obj.Iyy = Iyy;
             obj.Izz = Izz;
             obj.u_n = u_n;
-            obj.lin = pi/8;
+            obj.lin = pi/12;
         end
         
         function obj = input(obj,u,dt)
@@ -100,16 +99,15 @@ classdef quad_model
         function obj = PID_att_control(obj,des,T,dt)
             % k = [kpr kpp kpy
             %      kdr kdp kdy]
-            k = [2.9 2.9 0.8;
-                 1.02 1.02 0.1];
+            k = [2.9 2.9 0.8 1.02 1.02 0.1];
             % st = x   y   z   r   p   y
             %      x_d y_d z_d r_d p_d y_d
             st = [0 0 0 1 1 1 0 0 0 1 1 1];
             %noisy = [0 0 0 0.1 0.1 0.1 0 0 0 0.1 0.1 0.1];
             truth = zeros(1,12);
             obs = obj.observe(st,truth);
-            e = [des; 0 0 0] - [obs(4:6); obs(10:12)];
-            u = [T sum(k.*e)];
+            e = k.*([des 0 0 0] - [obs(4:6) obs(10:12)]);
+            u = [T e(1)+e(4) e(2)+e(5) e(3)+e(6)];
             u(1) = max(u(1),0);
             obj = obj.input(u,dt);
         end
@@ -117,20 +115,45 @@ classdef quad_model
         function obj = PID_pos_control(obj,des,yaw,dt)
             % k = [kpx kpy kpz
             %      kdx kdy kdz]
-            k = [50.8 50.8 8.5;
-                 43.6  43.6  4.51];
+            k = [50.8 50.8 8.5 43.6  43.6  4.51];
             st = [1 1 1 0 0 0 1 1 1 0 0 0];
             R = [cos(obj.x(6)) sin(obj.x(6));
                  -sin(obj.x(6)) cos(obj.x(6))];
             %noisy = [0.1 0.1 0.1 0 0 0 0.1 0.1 0.1 0 0 0];
             truth = zeros(1,12);
             obs = obj.observe(st,truth);
-            e = des - [obs(1:3); obs(7:9)];
-            u = sum(k.*e);
+            e = k.*(des - [obs(1:3) obs(7:9)]);
+            u = [e(1)+e(4) e(2)+e(5) e(3)+e(6)];
             u = [u(1:2)*R u(3)];
             u = [-u(2) u(1) u(3)];
             u(1:2) = max(min(u(1:2),obj.lin),-obj.lin);
             obj = obj.PID_att_control([u(1:2),yaw],u(3)+obj.m*obj.g,dt);
+        end
+        
+        
+        % sensor readings
+        function data = imu(obj)
+            % returns angle, angular velocity
+            noise = [0.1 0.1 0.1 0.2 0.2 0.2];
+            data = [obj.x(4:6) obj.x(10:12)] + randn*sqrt(noise);
+            
+        end
+        
+        function data = gps(obj)
+            % returns x, y position
+            noise = [1 1];
+            data = obj.x(1:2) + randn*sqrt(noise);
+        end
+        
+        function data = vio(obj)
+            % returns x, y, z, r, p, y
+            noise = [0.2 0.2 0.2 0.1 0.1 0.1];
+            data = obj.x(1:6) + randn*sqrt(noise);
+        end
+        
+        % ekf
+        function x_hat = ekf(obj)
+            x_hat = obj.x;
         end
     end
 end

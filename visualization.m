@@ -1,22 +1,21 @@
-function [] = visualization( model_pts, T, des, data )
-%VISUALIZATION Summary of this function goes here
-%   Detailed explanation goes here
+function [] = visualization( model_pts, T, des, data, time )
     global x_
     global y_
     global z_
+    global dt
     global plot_size
     persistent first
     persistent h_
-    limit = 200;
+
+    t = dt*(max(-1,time-length(data))+1:1:time);
     
     if isempty(first)
         h1 = figure;
         set(h1, 'Position',[300 400 1100 500]);
         first(1) = 0;
         h_ = [];
-    end
-    
-    if size(h_) >= [limit, 3]
+    end    
+    if size(h_) >= [plot_size, 3]
         h_(1,:) = [];
     end
     h_(end+1,:) = T(2,:);
@@ -32,16 +31,21 @@ function [] = visualization( model_pts, T, des, data )
     scatter3(des(1,1),des(1,2),des(1,3),15);
     grid on
     title('Simulation');
+    
+    pt = max(z_,T(2,3));
     xlim([T(2,1)-x_ T(2,1)+x_]);
     ylim([T(2,2)-y_ T(2,2)+y_]);
-    zlim([T(2,3)-z_ T(2,3)+z_]);
+    zlim([pt-z_ pt+z_]);
+    
+    win_z = 3;
+    pt = max(win_z,data(end));
     
     subplot(1,2,2);
     hold off;
-    plot(data);
+    plot(t,data);
     title('Tracking Error');
-    xlim([0 plot_size+50]);
-    ylim([data(end)-5 data(end)+5]);
+    xlim([t(1) t(end)+dt+t(end)*0.1]);
+    ylim([pt-win_z, pt+win_z]);
     grid on
 end
 
